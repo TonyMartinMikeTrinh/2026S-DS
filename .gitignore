@@ -16,3 +16,7 @@ build/
 
 # OS / misc
 Thumbs.db
+
+# Claude-spezifisch (lokal, nicht versioniert)
+/CLAUDE.md
+/plans/
