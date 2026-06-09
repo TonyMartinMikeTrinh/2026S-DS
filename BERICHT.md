@@ -27,17 +27,17 @@ echten UDP-Sockets auf localhost, **(2)** verteilt über reale Rechner, **(3)** 
 
 ```mermaid
 sequenceDiagram
-    participant N0 as Knoten 0 (Initiator)
+    participant N0 as Knoten 0 Initiator
     participant N1 as Knoten 1
     participant N2 as Knoten 2
-    N0->>N1: Token(lap, fired, fwTotal)
-    Note over N1: doTurn: zünde? (p) → broadcast Fire; p = p/2
-    N1-->>N0: Fire (Broadcast)
-    N1-->>N2: Fire (Broadcast)
+    N0->>N1: Token lap fired fwTotal
+    Note over N1: doTurn, zuenden mit p, danach p halbieren
+    N1-->>N0: Fire Broadcast
+    N1-->>N2: Fire Broadcast
     N1->>N2: Token
-    N2->>N0: Token (Runde abgeschlossen)
-    Note over N0: Rundenzeit messen; fired==0 ? quiet++ : quiet=0
-    Note over N0: quiet ≥ k → Terminierung
+    N2->>N0: Token, Runde abgeschlossen
+    Note over N0: Rundenzeit messen, stille Runden zaehlen
+    Note over N0: k stille Runden, dann Terminierung
 ```
 
 ---
@@ -112,15 +112,35 @@ und der zweite Thread pro Knoten samt `volatile`/`Atomic`. Der gesamte Ring ist 
 
 ```mermaid
 classDiagram
-    class Node { <<sim4da>> +engage() #send(Message,String) #broadcast(Message) #receive() ReceivedMessage }
-    class RingNode { -rank -n -successor -p -fireworksObserved +engage() -doTurn(Token) Token }
+    class Node {
+        <<sim4da>>
+        +engage()
+        +send(msg, ziel)
+        +broadcast(msg)
+        +receive()
+    }
+    class RingNode {
+        -rank
+        -successor
+        -p
+        -fireworksObserved
+        +engage()
+        -doTurn(token)
+    }
     Node <|-- RingNode
-    class Token { lap; fired; fwTotal }
-    class Fire { rank; lap }
-    class Stop { }
-    RingNode ..> Token : sendet an Nachfolger
+    class Token {
+        +int lap
+        +int fired
+        +long fwTotal
+    }
+    class Fire {
+        +int rank
+        +int lap
+    }
+    class Stop
+    RingNode ..> Token : an Nachfolger
     RingNode ..> Fire : broadcast
-    RingNode ..> Stop : broadcast (Terminierung)
+    RingNode ..> Stop : Terminierung
 ```
 
 **Messung (`run_sim.py`, `-Xss256k -Xmx2g`):**
@@ -164,13 +184,13 @@ länger als der 90-s-Watchdog. Mit kleinerem `-Xss` ginge `n` höher, aber unpra
 ```mermaid
 sequenceDiagram
     participant N0 as Knoten 0
-    participant Ring as Knoten 1..n-1
+    participant R as andere Knoten
     Note over N0: k stille Runden erreicht
-    N0->>Ring: Finalize{observed={0:c0}}  (Phase 1, FIFO-Ring)
-    Note over Ring: je Knoten: observed[i]=eigene Zählung
-    Ring->>N0: Finalize{observed=alle n}
-    Note over N0: Vergleich aller observed == fwTotal ?
-    N0-->>Ring: Stop (Phase 2, erst jetzt)
+    N0->>R: Finalize Phase 1 ueber FIFO-Ring
+    Note over R: jeder Knoten haengt seine Zaehlung an
+    R->>N0: Finalize mit allen Zaehlungen
+    Note over N0: Vergleich aller Zaehlungen mit fwTotal
+    N0-->>R: Stop Phase 2 erst jetzt
 ```
 
 ### Ergebnisse
